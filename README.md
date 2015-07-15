@@ -3,9 +3,6 @@
 an async clojure NATS client, wrapping java-nats and exposing manifold streams
 on subscriptions
 
-the subscription stream is a stream of java-nats Message objects rather than
-anything more clojure-y
-
 ## Usage
 
     (require '[clj-nats-async :as nats])

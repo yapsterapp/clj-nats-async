@@ -5,9 +5,9 @@ on subscriptions
 
 ## Usage
 
-    (require '[clj-nats-async :as nats])
+    (require '[clj-nats-async.core :as nats])
 
-    (defn n (nats/create-nats "nats://localhost:4222"))
+    (def n (nats/create-nats "nats://localhost:4222"))
 
     (def s (nats/subscribe n "foo"))
     (def msg (manifold.stream/take! (:stream s)))

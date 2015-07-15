@@ -27,7 +27,7 @@
   (msg-body [self] (.getBody nats-message)))
 
 (defn subscribe
-  "returns an INatsSubscription with a stream of Messages"
+  "returns an INatsSubscription with a stream of INatsMessages"
   ([nats subject] (subscribe nats subject {}))
   ([nats subject {:keys [queue-group max-messages] :as opts}]
    (let [stream (s/stream)

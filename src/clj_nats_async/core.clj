@@ -1,12 +1,14 @@
 (ns clj-nats-async.core
-  (:require [manifold.stream :as s])
+  (:require [clojure.string :as str]
+            [manifold.stream :as s])
   (:import [nats.client NatsConnector MessageHandler Message]))
 
 (defn create-nats
-  "creates a Nats connection, returning a Nats object"
+  "creates a Nats connection, returning a Nats object
+   - urls : nats server urls, either a seq or comma separated"
   [& urls]
   (let [nc (NatsConnector.)]
-    (doseq [url urls]
+    (doseq [url (flatten (map #(str/split % #",") urls))]
       (.addHost nc url))
     (.connect nc)))
 

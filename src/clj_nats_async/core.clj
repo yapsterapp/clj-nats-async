@@ -1,5 +1,6 @@
 (ns clj-nats-async.core
   (:require [clojure.string :as str]
+            [clojure.tools.logging :as log]
             [manifold.stream :as s])
   (:import [nats.client NatsConnector MessageHandler Message]))
 
@@ -12,15 +13,6 @@
       (.addHost nc url))
     (.connect nc)))
 
-(defprotocol INatsSubscription
-  (close [self]))
-
-(defrecord NatsSubscription [nats nats-subscription stream]
-  INatsSubscription
-  (close [_]
-    (.close nats-subscription)
-    (s/close! stream)))
-
 (defprotocol INatsMessage
   (msg-body [self]))
 
@@ -28,23 +20,33 @@
   INatsMessage
   (msg-body [self] (.getBody nats-message)))
 
+(defn ^:private create-nats-subscription
+  [nats subject {:keys [queue-group max-messages] :as opts} stream]
+  (.subscribe
+   nats
+   subject
+   queue-group
+   max-messages
+   (into-array
+    MessageHandler
+    [(reify
+       MessageHandler
+       (onMessage [self m]
+         (s/put! stream (NatsMessage. m))))])))
+
 (defn subscribe
-  "returns an INatsSubscription with a stream of INatsMessages"
+  "returns a a Manifold source-only stream of INatsMessages from a NATS subject.
+   close the stream to dispose of the subscription"
   ([nats subject] (subscribe nats subject {}))
-  ([nats subject {:keys [queue-group max-messages] :as opts}]
+  ([nats subject opts]
    (let [stream (s/stream)
-         nats-subscription (.subscribe
-                            nats
-                            subject
-                            queue-group
-                            max-messages
-                            (into-array
-                             MessageHandler
-                             [(reify
-                                MessageHandler
-                                (onMessage [self m]
-                                  (s/put! stream (NatsMessage. m))))]))]
-     (NatsSubscription. nats nats-subscription stream))))
+         source (s/source-only stream)
+         nats-subscription (create-nats-subscription nats subject opts stream)]
+
+     (s/on-closed stream (fn []
+                           (.close nats-subscription)))
+
+     source)))
 
 (defn publish
   "publish a message"
@@ -52,3 +54,29 @@
   ([nats subject body] (publish nats subject body {}))
   ([nats subject body {:keys [reply-to] :as opts}]
    (.publish nats subject body reply-to)))
+
+(defn publisher
+  "returns a Manifold sink-only stream which publishes
+   to a given subject"
+  ([nats subject]
+   (let [stream (s/sink-only (s/stream))]
+     (s/consume (fn [body]
+                  (publish nats subject body))
+                stream))))
+
+(defn pubsub
+  "returns a Manifold source+sink stream for a NATS subject.
+   the source returns INatsMessages, while the sink accepts
+   strings"
+  ([nats subject] (pubsub nats subject {}))
+  ([nats subject opts]
+   (let [pub-stream (s/stream)
+         sub-stream (s/stream)
+
+         nats-subscription (create-nats-subscription nats subject opts sub-stream)]
+
+     (s/consume (fn [body] (publish nats subject body)) pub-stream)
+
+     (s/on-closed sub-stream (fn [] (.close nats-subscription)))
+
+     (s/splice pub-stream sub-stream))))

@@ -1,7 +1,12 @@
 # clj-nats-async
 
-an async clojure NATS client, wrapping java-nats and exposing manifold streams
-on subscriptions
+an async clojure NATS client, wrapping java-nats
+
+creates Manifold streams on a NATS subject for :
+
+- publish only (a sink-only stream)
+- subscribe only (a source-only stream)
+- pubsub (a source+sink stream)
 
 ## Usage
 
@@ -9,13 +14,14 @@ on subscriptions
 
     (def n (nats/create-nats "nats://localhost:4222"))
 
-    (def s (nats/subscribe n "foo"))
-    (def msg (manifold.stream/take! (:stream s)))
+    (def s (nats/pubsub n "foo"))
 
-    (nats/publish n "foo" "boo")
+    (manifold.stream/put! s "boo")
 
-    (nats/msg-body @msg)
+    (def msg (manifold.stream/take! s))
+    (nats/msg-body @msg) ;; => "boo"
 
+    (.close s)
 
 ## License
 

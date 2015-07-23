@@ -1,6 +1,7 @@
 (ns clj-nats-async.core
   (:require [clojure.string :as str]
             [clojure.tools.logging :as log]
+            [clojure.edn :as edn]
             [manifold.stream :as s])
   (:import [nats.client NatsConnector MessageHandler Message]))
 
@@ -18,7 +19,7 @@
 
 (defrecord NatsMessage [nats-message]
   INatsMessage
-  (msg-body [self] (.getBody nats-message)))
+  (msg-body [self] (edn/read-string (.getBody nats-message))))
 
 (defn ^:private create-nats-subscription
   [nats subject {:keys [queue-group max-messages] :as opts} stream]
@@ -54,7 +55,7 @@
   ([nats subject body] (publish nats subject body {}))
   ([nats subject body {:keys [reply-to] :as opts}]
    ;; (prn [subject body opts])
-   (.publish nats subject (str body) reply-to)))
+   (.publish nats subject (pr-str body) reply-to)))
 
 (defn publisher
   "returns a Manifold sink-only stream which publishes items put on the stream

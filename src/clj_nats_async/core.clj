@@ -53,16 +53,23 @@
   ([nats subject] (publish nats subject "" {}))
   ([nats subject body] (publish nats subject body {}))
   ([nats subject body {:keys [reply-to] :as opts}]
-   (.publish nats subject body reply-to)))
+   ;; (prn [subject body opts])
+   (.publish nats subject (str body) reply-to)))
 
 (defn publisher
-  "returns a Manifold sink-only stream which publishes
-   to a given subject"
-  ([nats subject]
-   (let [stream (s/sink-only (s/stream))]
+  "returns a Manifold sink-only stream which publishes items put on the stream
+   to NATS
+   - subject-or-fn : either a string specifying a fixed subject or a
+                     (fn [item] ...) which extracts a subject from an item"
+  ([nats subject-or-fn]
+   (let [stream (s/stream)
+         subject-fn (if (fn? subject-or-fn)
+                      subject-or-fn
+                      (constantly subject-or-fn))]
      (s/consume (fn [body]
-                  (publish nats subject body))
-                stream))))
+                  (publish nats (subject-fn body) body))
+                stream)
+     (s/sink-only stream))))
 
 (defn pubsub
   "returns a Manifold source+sink stream for a NATS subject.

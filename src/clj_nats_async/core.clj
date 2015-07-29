@@ -50,30 +50,30 @@
      source)))
 
 (defn publish
-  "publish a message"
-  ([nats subject] (publish nats subject "" {}))
-  ([nats subject body] (publish nats subject body {}))
-  ([nats subject body {:keys [reply-to] :as opts}]
-   ;; (prn [subject body opts])
-   (.publish nats subject (pr-str body) reply-to)))
+  "publish a message
+  - subject-or-fn : either a string specifying a fixed subject or a
+                     (fn [item] ...) which extracts a subject from an item"
+  ([nats subject-or-fn] (publish nats subject-or-fn "" {}))
+  ([nats subject-or-fn body] (publish nats subject-or-fn body {}))
+  ([nats subject-or-fn body {:keys [reply-to] :as opts}]
+   (let [is-subject-fn? (or (var? subject-or-fn) (fn? subject-or-fn))
+         subject (if is-subject-fn? (subject-or-fn body) subject-or-fn)]
+     (if subject
+       (.publish nats subject (pr-str body) reply-to)
+       (log/warn (ex-info (str "no subject " (if is-subject-fn? "extracted" "given")) {:body body}))))))
 
 (defn publisher
   "returns a Manifold sink-only stream which publishes items put on the stream
-   to NATS
-   - subject-or-fn : either a string specifying a fixed subject or a
-                     (fn [item] ...) which extracts a subject from an item"
+   to NATS"
   ([nats subject-or-fn]
-   (let [stream (s/stream)
-         subject-fn (if (fn? subject-or-fn)
-                      subject-or-fn
-                      (constantly subject-or-fn))]
+   (let [stream (s/stream)]
      (s/consume (fn [body]
-                  (publish nats (subject-fn body) body))
+                  (publish nats subject-or-fn body))
                 stream)
      (s/sink-only stream))))
 
 (defn pubsub
-  "returns a Manifold source+sink stream for a NATS subject.
+  "returns a Manifold source+sink stream for a single NATS subject.
    the source returns INatsMessages, while the sink accepts
    strings"
   ([nats subject] (pubsub nats subject {}))

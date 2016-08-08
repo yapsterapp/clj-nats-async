@@ -3,37 +3,37 @@
             [clojure.tools.logging :as log]
             [clojure.edn :as edn]
             [manifold.stream :as s])
-  (:import [nats.client NatsConnector MessageHandler Message]))
+  (:import [io.nats.client ConnectionFactory Connection MessageHandler Message]))
 
 (defn create-nats
   "creates a Nats connection, returning a Nats object
    - urls : nats server urls, either a seq or comma separated"
   [& urls]
-  (let [nc (NatsConnector.)]
-    (doseq [url (flatten (map #(str/split % #",") urls))]
-      (.addHost nc url))
-    (.connect nc)))
+  (let [servers (flatten (map #(str/split % #",") urls))
+        j-servers (into-array String servers)
+        cf (ConnectionFactory. j-servers)]
+    (.createConnection cf)))
 
 (defprotocol INatsMessage
-  (msg-body [self]))
+  (msg-body [_]))
 
 (defrecord NatsMessage [nats-message]
   INatsMessage
-  (msg-body [self] (edn/read-string (.getBody nats-message))))
+  (msg-body [_]
+    (edn/read-string
+     (String. (.getData nats-message)
+              "UTF-8"))))
 
 (defn ^:private create-nats-subscription
-  [nats subject {:keys [queue-group max-messages] :as opts} stream]
-  (.subscribe
+  [nats subject {:keys [queue] :as opts} stream]
+  (.subscribeAsync
    nats
    subject
-   queue-group
-   max-messages
-   (into-array
-    MessageHandler
-    [(reify
-       MessageHandler
-       (onMessage [self m]
-         (s/put! stream (NatsMessage. m))))])))
+   queue
+   (reify
+     MessageHandler
+     (onMessage [_ m]
+       (s/put! stream (map->NatsMessage {:nats-message m}))))))
 
 (defn subscribe
   "returns a a Manifold source-only stream of INatsMessages from a NATS subject.
@@ -46,7 +46,6 @@
 
      (s/on-closed stream (fn []
                            (.close nats-subscription)))
-
      source)))
 
 (defn publish
@@ -55,12 +54,15 @@
                      (fn [item] ...) which extracts a subject from an item"
   ([nats subject-or-fn] (publish nats subject-or-fn "" {}))
   ([nats subject-or-fn body] (publish nats subject-or-fn body {}))
-  ([nats subject-or-fn body {:keys [reply-to] :as opts}]
+  ([nats subject-or-fn body {:keys [reply] :as opts}]
    (let [is-subject-fn? (or (var? subject-or-fn) (fn? subject-or-fn))
          subject (if is-subject-fn? (subject-or-fn body) subject-or-fn)]
      (if subject
-       (.publish nats subject (pr-str body) reply-to)
-       (log/warn (ex-info (str "no subject " (if is-subject-fn? "extracted" "given")) {:body body}))))))
+       (.publish nats subject reply (.getBytes (pr-str body) "UTF-8"))
+       (log/warn (ex-info
+                  (str "no subject "
+                       (if is-subject-fn? "extracted" "given"))
+                  {:body body}))))))
 
 (defn publisher
   "returns a Manifold sink-only stream which publishes items put on the stream

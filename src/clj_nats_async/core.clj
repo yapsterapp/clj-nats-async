@@ -43,9 +43,10 @@
    (let [stream (s/stream)
          source (s/source-only stream)
          nats-subscription (create-nats-subscription nats subject opts stream)]
-
-     (s/on-closed stream (fn []
-                           (.close nats-subscription)))
+     (s/on-closed stream
+                  (fn []
+                    (log/info "closing NATS subscription: " subject)
+                    (.close nats-subscription)))
      source)))
 
 (defn publish

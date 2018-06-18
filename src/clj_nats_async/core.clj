@@ -26,7 +26,7 @@
 
 (defn ^:private create-nats-subscription
   [nats subject {:keys [queue] :as opts} stream]
-  (.subscribeAsync
+  (.subscribe
    nats
    subject
    queue

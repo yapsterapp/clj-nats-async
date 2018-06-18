@@ -1,4 +1,4 @@
-(defproject clj-nats-async "1.2.1"
+(defproject clj-nats-async "1.2.2"
   :description "an async client for NATS, wrapping java-nats"
   :url "https://github.com/employeerepublic/clj-nats-async"
   :license {:name "Apache License, Version 2.0"

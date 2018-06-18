@@ -1,4 +1,4 @@
-(defproject alexeypopov/clj-nats-async "1.3.0-SNAPSHOT"
+(defproject alexeypopov/clj-nats-async "1.3.0"
   :description "an async client for NATS, wrapping java-nats"
   :url "https://github.com/AlexeyPopov/clj-nats-async"
   :license {:name "Apache License, Version 2.0"

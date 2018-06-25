@@ -3,15 +3,31 @@
             [clojure.tools.logging :as log]
             [clojure.edn :as edn]
             [manifold.stream :as s])
-  (:import [io.nats.client ConnectionFactory Connection MessageHandler Message]))
+  (:import [io.nats.client
+            ConnectionFactory
+            Connection
+            MessageHandler
+            Message
+            Nats]))
+
+(defn configure-global-message-delivery-thread-pool
+  "configure the global-message-delivery-thread-pool, if not already configured"
+  ([] (configure-global-message-delivery-thread-pool 100))
+  ([pool-size]
+   (when (= 0 (Nats/getMsgDeliveryThreadPoolSize))
+     (Nats/createMsgDeliveryThreadPool pool-size))))
 
 (defn create-nats
-  "creates a Nats connection, returning a Nats object
+  "creates a Nats connection, returning a Nats object. uses the global
+   message delivery threadpool, and configures it with a default pool-size
+   of 100 if it's not already configured
    - urls : nats server urls, either a seq or comma separated"
   [& urls]
   (let [servers (flatten (map #(str/split % #",") urls))
         j-servers (into-array String servers)
         cf (ConnectionFactory. j-servers)]
+    (configure-global-message-delivery-thread-pool)
+    (.setUseGlobalMessageDelivery cf true)
     (.createConnection cf)))
 
 (defprotocol INatsMessage

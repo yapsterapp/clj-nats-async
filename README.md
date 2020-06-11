@@ -10,6 +10,7 @@ creates Manifold streams on a NATS subject for :
 
 ## Usage
 
+```clojure
     (require '[clj-nats-async.core :as nats])
 
     (def n (nats/create-nats "nats://localhost:4222"))
@@ -22,6 +23,7 @@ creates Manifold streams on a NATS subject for :
     (nats/msg-body @msg) ;; => "boo"
 
     (.close s)
+```
 
 ## License
 
